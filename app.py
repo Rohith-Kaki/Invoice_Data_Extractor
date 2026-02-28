@@ -57,11 +57,11 @@ class ModelConfig:
 
 MODEL_REGISTRY: Dict[str, ModelConfig] = {
     "GPT-5": ModelConfig(
-        display_name="GPT-5 (OpenAI Responses API)",
+        display_name="GPT-5 (OpenAI)",
         provider="openai",
         model_name="gpt-5",
         env_key="OPENAI_API_KEY",
-        endpoint="https://api.openai.com/v1/responses",
+        endpoint="https://api.openai.com/v1/chat/completions",
     ),
     "Mistral OCR 3": ModelConfig(
         display_name="Mistral OCR 3",
@@ -77,13 +77,6 @@ MODEL_REGISTRY: Dict[str, ModelConfig] = {
         env_key="ZHIPUAI_API_KEY",
         endpoint="https://open.bigmodel.cn/api/paas/v4/chat/completions",
     ),
-    "Ollama (local fallback)": ModelConfig(
-        display_name="Ollama (local fallback)",
-        provider="ollama",
-        model_name="llava:13b",
-        env_key="",
-        endpoint="http://localhost:11434/api/chat",
-    ),
 }
 
 
@@ -92,12 +85,6 @@ def pil_to_data_url(image: Image.Image) -> str:
     image.save(buffer, format="PNG")
     encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
     return f"data:image/png;base64,{encoded}"
-
-
-def pil_to_base64(image: Image.Image) -> str:
-    buffer = io.BytesIO()
-    image.save(buffer, format="PNG")
-    return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
 def render_pdf_to_images(pdf_bytes: bytes, zoom: float = 2.0) -> List[Image.Image]:
@@ -124,61 +111,16 @@ def parse_json_strict(text: str) -> Dict[str, Any]:
         return json.loads(match.group(0))
 
 
-def extract_openai_responses(config: ModelConfig, images: List[Image.Image], company_name: str) -> Dict[str, Any]:
-    api_key = os.getenv(config.env_key)
-    if not api_key:
-        raise RuntimeError(f"Missing API key: {config.env_key}")
-
-    user_content = [{"type": "input_text", "text": f"Company name hint: {company_name}. Extract all invoice data."}]
-    for img in images:
-        user_content.append({"type": "input_image", "image_url": pil_to_data_url(img)})
-
-    payload = {
-        "model": config.model_name,
-        "reasoning": {"effort": "medium"},
-        "temperature": 0,
-        "text": {"format": {"type": "json_object"}},
-        "input": [
-            {"role": "system", "content": [{"type": "input_text", "text": SYSTEM_PROMPT}]},
-            {"role": "user", "content": user_content},
-        ],
-    }
-
-    response = requests.post(
-        config.endpoint,
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json=payload,
-        timeout=240,
-    )
-    if response.status_code >= 400:
-        details = response.text
-        raise RuntimeError(
-            "OpenAI request failed. This usually means model access/billing is not enabled for your key or the model is unavailable. "
-            f"Status={response.status_code}. Response={details[:500]}"
-        )
-
-    data = response.json()
-    text = data.get("output_text", "")
-    if not text:
-        fragments: List[str] = []
-        for item in data.get("output", []):
-            if item.get("type") == "message":
-                for c in item.get("content", []):
-                    if c.get("type") in {"output_text", "text"}:
-                        fragments.append(c.get("text", ""))
-        text = "\n".join(fragments)
-
-    extracted = parse_json_strict(text)
-    extracted.setdefault("company_name", company_name)
-    return extracted
-
-
-def extract_chat_vision(config: ModelConfig, images: List[Image.Image], company_name: str) -> Dict[str, Any]:
+def call_vision_chat_api(config: ModelConfig, images: List[Image.Image], company_name: str) -> Dict[str, Any]:
     api_key = os.getenv(config.env_key)
     if not api_key:
         raise RuntimeError(f"Missing API key: {config.env_key}")
 
     image_parts = [{"type": "image_url", "image_url": {"url": pil_to_data_url(img)}} for img in images]
+    user_prompt = (
+        f"Company name hint: {company_name}. "
+        "Extract all invoice data and normalize into required JSON schema."
+    )
 
     payload = {
         "model": config.model_name,
@@ -187,78 +129,30 @@ def extract_chat_vision(config: ModelConfig, images: List[Image.Image], company_
             {"role": "system", "content": SYSTEM_PROMPT},
             {
                 "role": "user",
-                "content": [{"type": "text", "text": f"Company name hint: {company_name}. Extract all invoice data."}, *image_parts],
+                "content": [{"type": "text", "text": user_prompt}, *image_parts],
             },
         ],
     }
 
-    response = requests.post(
-        config.endpoint,
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json=payload,
-        timeout=240,
-    )
-    if response.status_code >= 400:
-        raise RuntimeError(
-            f"{config.display_name} request failed (status {response.status_code}). "
-            f"Response: {response.text[:500]}"
-        )
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
 
+    response = requests.post(config.endpoint, headers=headers, json=payload, timeout=240)
+    response.raise_for_status()
     data = response.json()
+
     message = data["choices"][0]["message"]
     content = message.get("content", "")
     if isinstance(content, list):
-        text = "\n".join(part.get("text", "") for part in content if isinstance(part, dict))
+        text = "\n".join([part.get("text", "") for part in content if isinstance(part, dict)])
     else:
         text = content
 
     extracted = parse_json_strict(text)
     extracted.setdefault("company_name", company_name)
     return extracted
-
-
-def extract_with_ollama(config: ModelConfig, images: List[Image.Image], company_name: str, ollama_model: str) -> Dict[str, Any]:
-    prompt = (
-        f"{SYSTEM_PROMPT}\n\n"
-        f"Company name hint: {company_name}. "
-        "Extract all invoice data and return strict JSON only."
-    )
-    response = requests.post(
-        config.endpoint,
-        json={
-            "model": ollama_model,
-            "stream": False,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": prompt,
-                    "images": [pil_to_base64(img) for img in images],
-                }
-            ],
-        },
-        timeout=240,
-    )
-    if response.status_code >= 400:
-        raise RuntimeError(
-            f"Ollama request failed (status {response.status_code}). Ensure `ollama serve` is running and model is pulled. "
-            f"Response: {response.text[:500]}"
-        )
-
-    body = response.json()
-    text = body.get("message", {}).get("content", "")
-    extracted = parse_json_strict(text)
-    extracted.setdefault("company_name", company_name)
-    return extracted
-
-
-def call_vision_model(config: ModelConfig, images: List[Image.Image], company_name: str, ollama_model: str) -> Dict[str, Any]:
-    if config.provider == "openai":
-        return extract_openai_responses(config, images, company_name)
-    if config.provider in {"mistral", "glm"}:
-        return extract_chat_vision(config, images, company_name)
-    if config.provider == "ollama":
-        return extract_with_ollama(config, images, company_name, ollama_model)
-    raise RuntimeError(f"Unsupported provider: {config.provider}")
 
 
 def make_safe_name(name: str) -> str:
@@ -318,19 +212,8 @@ def main() -> None:
     with st.sidebar:
         st.header("Configuration")
         model_key = st.selectbox("Choose extraction model", list(MODEL_REGISTRY.keys()), index=0)
-        model_cfg = MODEL_REGISTRY[model_key]
-        if model_cfg.env_key:
-            st.markdown("Required env key:")
-            st.code(model_cfg.env_key)
-        else:
-            st.success("No cloud key needed for local Ollama mode.")
-
-        ollama_model = st.text_input("Ollama model name", value="llava:13b")
-
-    st.info(
-        "If cloud APIs fail due to subscription/access errors (400/401/403), choose **Ollama (local fallback)** and run:\n"
-        "`ollama pull llava:13b` then `ollama serve`."
-    )
+        st.markdown("Required env key:")
+        st.code(MODEL_REGISTRY[model_key].env_key)
 
     col_left, col_right = st.columns([1.2, 1])
 
@@ -347,18 +230,14 @@ def main() -> None:
                 else:
                     images = [Image.open(uploaded_file).convert("RGB")]
 
-                with st.spinner(f"Extracting using {model_cfg.display_name}..."):
-                    result = call_vision_model(model_cfg, images, company_name, ollama_model)
+                with st.spinner(f"Extracting using {MODEL_REGISTRY[model_key].display_name}..."):
+                    result = call_vision_chat_api(MODEL_REGISTRY[model_key], images, company_name)
 
                 saved_path = save_extraction(company_name, uploaded_file.name, result)
                 st.success(f"Saved extraction to: {saved_path}")
                 st.json(result)
             except Exception as exc:
                 st.error(f"Extraction failed: {exc}")
-                st.warning(
-                    "Tip: If you don't have paid access for all cloud providers, use one provider that is enabled or switch to "
-                    "Ollama local fallback in the sidebar."
-                )
 
     with col_right:
         show_saved_tree(load_saved_tree())
