@@ -19,13 +19,26 @@ model_choice = st.sidebar.selectbox(
     ["GPT-5"]
 )
 
-company_name = st.sidebar.text_input("Company Name")
-
-uploaded_file = st.file_uploader(
-    "Upload Invoice",
-    type=["png", "jpg", "jpeg", "pdf"]
+mode = st.sidebar.radio(
+    "Select Mode",
+    ["Upload Invoice", "View Invoices"]
 )
 
+def cleanup_files(paths):
+    for p in paths:
+        if os.path.exists(p):
+            os.remove(p)
+
+def get_companies():
+    if not os.path.exists(DATA_DIR):
+        return []
+    return [d for d in os.listdir(DATA_DIR)
+            if os.path.isdir(os.path.join(DATA_DIR, d))]
+
+
+def get_invoices(company):
+    path = os.path.join(DATA_DIR, company)
+    return [f for f in os.listdir(path) if f.endswith(".json")]
 
 # -------- Helper Functions --------
 
@@ -58,95 +71,159 @@ def pdf_to_images(pdf_path):
 
 # -------- Main Flow --------
 
-if uploaded_file:
+if mode == "View Invoices":
 
-    temp_path = f"temp_{uploaded_file.name}"
+    st.header("Invoice Repository")
 
-    with open(temp_path, "wb") as f:
-        f.write(uploaded_file.read())
+    companies = get_companies()
 
-    # Preview
-    if uploaded_file.type == "application/pdf":
-        st.info("PDF uploaded — will convert to images")
-    else:
-        st.image(temp_path, width=400)
+    if not companies:
+        st.info("No invoices found yet")
+        st.stop()
 
-    if st.button("Extract Data"):
+    company = st.selectbox("Select Company", companies)
 
-        if not company_name:
-            st.error("Enter Company Name in sidebar")
-            st.stop()
+    invoices = get_invoices(company)
 
-        with st.spinner("Processing invoice..."):
+    if not invoices:
+        st.warning("No invoices for this company")
+        st.stop()
 
-            # PDF Handling
-            if temp_path.endswith(".pdf"):
-                image_paths = pdf_to_images(temp_path)
+    invoice_file = st.selectbox("Select Invoice", invoices)
 
-                all_pages = []
-                for img in image_paths:
-                    page_data = extract_with_gpt5(img)
-                    all_pages.append(page_data)
+    file_path = os.path.join(DATA_DIR, company, invoice_file)
 
-                # Merge items from all pages
-                data = all_pages[0]
-                merged_items = []
+    with open(file_path, "r") as f:
+        data = json.load(f)
 
-                for page in all_pages:
-                    if "items" in page:
-                        merged_items.extend(page["items"])
+    # Display nicely
+    col1, col2 = st.columns(2)
 
-                data["items"] = merged_items
+    with col1:
+        st.subheader("Invoice Summary")
+        st.write("Company:", data.get("seller", {}).get("name"))
+        st.write("Invoice No:", data.get("invoice_number"))
+        st.write("Date:", data.get("issue_date"))
+        st.write("Currency:", data.get("currency", {}).get("code"))
+        st.write("Total:", data.get("total"))
 
-            else:
-                data = extract_with_gpt5(temp_path)
+        if "items" in data:
+            st.subheader("Line Items")
+            st.table(data["items"])
 
-            # Invoice number fallback
-            invoice_number = data.get(
-                "invoice_number",
-                str(datetime.now().timestamp())
-            )
+    with col2:
+        st.subheader("Full JSON")
+        st.json(data)
 
-            save_path = save_invoice(company_name, invoice_number, data)
 
-        st.success(f"Saved to: {save_path}")
 
-        # -------- Display --------
+if mode == "Upload Invoice":
 
-        col1, col2 = st.columns(2)
+    st.header("Upload New Invoice")
 
-        with col1:
-            st.subheader("Invoice Summary")
+    company_name = st.sidebar.text_input("Company Name", key="upload_company")
 
-            st.write(
-                "Company:",
-                data.get("bill_to", {}).get("name", "Not found")
-            )
+    uploaded_file = st.file_uploader(
+    "Upload Invoice",
+    type=["png", "jpg", "jpeg", "pdf"]
+    )
 
-            st.write(
-                "Invoice No:",
-                data.get("invoice_number", "Not found")
-            )
+    if uploaded_file is not None:
+        temp_files = []
+        data = None
+        save_path = None
 
-            st.write(
-                "Date:",
-                data.get("dates", {}).get("issue_date", "Not found")
-            )
+        # Unique temp name
+        temp_path = f"temp_{datetime.now().timestamp()}_{uploaded_file.name}"
+        temp_files.append(temp_path)
 
-            st.write(
-                "Currency:",
-                data.get("currency", {}).get("code", "Not found")
-            )
+        with open(temp_path, "wb") as f:
+            f.write(uploaded_file.read())
 
-            st.write(
-                "Total:",
-                data.get("total", "Not found")
-            )
+        # Preview
+        if uploaded_file.type == "application/pdf":
+            st.info("PDF uploaded — will convert to images")
+        else:
+            st.image(temp_path, width=400)
 
-            if "line_items" in data:
-                st.subheader("line_items")
-                st.table(data["line_items"])
+        if st.button("Extract Data"):
 
-        with col2:
-            st.subheader("Full JSON")
-            st.json(data)
+            if not company_name:
+                st.error("Enter Company Name in sidebar")
+                st.stop()
+
+            try:
+                with st.spinner("Processing invoice..."):
+
+                    # PDF Handling
+                    if temp_path.endswith(".pdf"):
+                        image_paths = pdf_to_images(temp_path)
+                        temp_files.extend(image_paths)
+
+                        all_pages = []
+                        for img in image_paths:
+                            page_data = extract_with_gpt5(img)
+                            all_pages.append(page_data)
+
+                        data = all_pages[0]
+                        merged_items = []
+
+                        for page in all_pages:
+                            if "items" in page:
+                                merged_items.extend(page["items"])
+
+                        data["items"] = merged_items
+
+                    else:
+                        data = extract_with_gpt5(temp_path)
+
+                    invoice_number = data.get(
+                        "invoice_number",
+                        str(datetime.now().timestamp())
+                    )
+
+                    save_path = save_invoice(company_name, invoice_number, data)
+
+            except Exception as e:
+                st.error(f"Extraction failed: {e}")
+
+            finally:
+                cleanup_files(temp_files)
+
+            # -------- Display ONLY if success --------
+            if data:
+                st.success(f"Saved to: {save_path}")
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.subheader("Invoice Summary")
+
+                    st.write(
+                        "Company:",
+                        data.get("bill_to", {}).get("name", "Not found")
+                    )
+                    st.write(
+                        "Invoice No:",
+                        data.get("invoice_number", "Not found")
+                    )
+                    st.write(
+                        "Date:",
+                        data.get("issue_date", "Not found")
+                    )
+                    st.write(
+                        "Currency:",
+                        data.get("currency", {}).get("code", "Not found")
+                    )
+                    st.write(
+                        "Total:",
+                        data.get("total", "Not found")
+                    )
+
+                    if "items" in data:
+                        st.subheader("Items")
+                        st.table(data["items"])
+
+                with col2:
+                    st.subheader("Full JSON")
+                    st.json(data)
