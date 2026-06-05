@@ -2,3 +2,6 @@ streamlit>=1.41.0
 requests>=2.32.3
 pymupdf>=1.25.0
 pillow>=11.1.0
+openai>=2.24.0
+python-dotenv>=1.2.1
+pdf2image>=1.17.0
