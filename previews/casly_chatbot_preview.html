@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Casly Homes Chatbot Preview</title>
+  <style>
+    :root {
+      --casly-ink: #17211b;
+      --casly-forest: #234337;
+      --casly-sage: #80936d;
+      --casly-cream: #f7f1e7;
+      --casly-gold: #c8a96a;
+      --casly-white: #fffdf7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--casly-ink);
+      background:
+        radial-gradient(circle at 12% 8%, rgba(200,169,106,.22), transparent 26%),
+        linear-gradient(135deg, #14231d 0%, #263f35 45%, #f7f1e7 45.2%, #efe4d4 100%);
+      padding: 34px;
+    }
+    .preview-note {
+      max-width: 1180px;
+      margin: 0 auto 16px;
+      padding: 12px 16px;
+      border: 1px solid rgba(255,255,255,.24);
+      border-radius: 16px;
+      background: rgba(255,255,255,.11);
+      color: rgba(255,253,247,.88);
+      backdrop-filter: blur(14px);
+      font-size: 14px;
+    }
+    .casly-shell {
+      max-width: 1180px;
+      margin: 0 auto;
+      min-height: 760px;
+      padding: 34px;
+      border-radius: 30px;
+      background: rgba(255,255,255,.06);
+      box-shadow: 0 28px 70px rgba(23,33,27,.24);
+      border: 1px solid rgba(255,255,255,.16);
+    }
+    .casly-hero {
+      display: grid;
+      grid-template-columns: 1.02fr .98fr;
+      gap: 32px;
+      align-items: stretch;
+    }
+    .casly-copy {
+      color: var(--casly-white);
+      padding: 22px 12px 22px 6px;
+    }
+    .casly-kicker {
+      display: inline-flex;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 13px;
+      border: 1px solid rgba(255,255,255,.24);
+      border-radius: 999px;
+      background: rgba(255,255,255,.09);
+      font-size: 13px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 22px 0 16px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(42px, 6vw, 74px);
+      line-height: .94;
+      letter-spacing: -.045em;
+    }
+    .casly-copy p {
+      max-width: 620px;
+      color: rgba(255,253,247,.82);
+      font-size: 18px;
+      line-height: 1.7;
+    }
+    .proof-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 28px;
+    }
+    .proof {
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 18px;
+      padding: 15px;
+      background: rgba(255,255,255,.08);
+      backdrop-filter: blur(16px);
+    }
+    .proof strong { display: block; font-size: 24px; color: #fff; }
+    .proof span { color: rgba(255,253,247,.72); font-size: 13px; }
+    .chat-card {
+      border-radius: 30px;
+      overflow: hidden;
+      background: rgba(255,253,247,.94);
+      border: 1px solid rgba(255,255,255,.55);
+      box-shadow: 0 24px 80px rgba(16,28,22,.30);
+    }
+    .chat-topbar {
+      padding: 18px 20px;
+      background: linear-gradient(135deg, #fffaf1, #efe2d0);
+      border-bottom: 1px solid rgba(35,67,55,.13);
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+    }
+    .avatar-lockup { display: flex; align-items: center; gap: 12px; }
+    .avatar {
+      width: 46px; height: 46px;
+      border-radius: 16px;
+      display: grid; place-items: center;
+      background: linear-gradient(135deg, #234337, #80936d);
+      color: #fff7e8;
+      font-family: Georgia, "Times New Roman", serif;
+      font-weight: 700;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.20);
+    }
+    .avatar-lockup h3 { margin: 0; color: #17211b; font-size: 18px; }
+    .avatar-lockup small { color: #657065; }
+    .status-pill {
+      padding: 8px 11px;
+      border-radius: 999px;
+      background: rgba(128,147,109,.16);
+      color: #234337;
+      font-weight: 650;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .chat-window {
+      min-height: 470px;
+      max-height: 470px;
+      overflow-y: auto;
+      padding: 22px;
+      background:
+        linear-gradient(rgba(255,253,247,.90), rgba(255,253,247,.90)),
+        repeating-linear-gradient(45deg, rgba(35,67,55,.04) 0 1px, transparent 1px 18px);
+    }
+    .bubble-row { display: flex; margin: 13px 0; }
+    .bubble-row.user { justify-content: flex-end; }
+    .bubble {
+      max-width: 78%;
+      padding: 13px 15px;
+      border-radius: 20px;
+      line-height: 1.48;
+      font-size: 15px;
+    }
+    .bubble.bot {
+      color: #17211b;
+      background: #fffaf1;
+      border: 1px solid rgba(35,67,55,.10);
+      border-bottom-left-radius: 7px;
+      box-shadow: 0 10px 24px rgba(23,33,27,.06);
+    }
+    .bubble.user {
+      color: #fffdf7;
+      background: linear-gradient(135deg, #234337, #3f6655);
+      border-bottom-right-radius: 7px;
+    }
+    .bubble-time { display: block; margin-top: 7px; opacity: .62; font-size: 11px; }
+    .suggestions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      padding: 0 22px 18px;
+      background: rgba(255,253,247,.94);
+    }
+    button {
+      cursor: pointer;
+      border-radius: 999px;
+      border: 1px solid rgba(35,67,55,.22);
+      background: #fffaf1;
+      color: #234337;
+      font-weight: 700;
+      padding: 11px 13px;
+    }
+    button:hover { border-color: var(--casly-gold); color: #17211b; }
+    .composer {
+      display: flex;
+      gap: 10px;
+      padding: 0 22px 22px;
+      background: rgba(255,253,247,.94);
+    }
+    input {
+      width: 100%;
+      border: 1px solid rgba(35,67,55,.18);
+      border-radius: 999px;
+      padding: 13px 16px;
+      outline: none;
+      background: #fffdf7;
+      color: var(--casly-ink);
+    }
+    .share-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 18px;
+    }
+    .share-card {
+      border-radius: 22px;
+      padding: 18px;
+      border: 1px solid rgba(255,255,255,.22);
+      background: rgba(255,250,241,.86);
+      box-shadow: 0 14px 34px rgba(23,33,27,.07);
+    }
+    .share-card h3 { margin-top: 0; }
+    code {
+      display: block;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      padding: 13px;
+      border-radius: 14px;
+      background: #17211b;
+      color: #f7f1e7;
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+    @media (max-width: 960px) {
+      body { padding: 16px; }
+      .casly-shell { padding: 18px; }
+      .casly-hero, .share-row { grid-template-columns: 1fr; }
+      .proof-row { grid-template-columns: 1fr; }
+      .bubble { max-width: 92%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-note">
+    Static preview: open this file directly in a browser to review the CaslyHomes chatbot design without Streamlit, Python, or API keys.
+  </div>
+  <main class="casly-shell">
+    <section class="casly-hero">
+      <div class="casly-copy">
+        <div class="casly-kicker">✦ CaslyHomes conversational prototype</div>
+        <h1>A polished home-finding assistant for boutique real estate.</h1>
+        <p>
+          This prototype shows the website widget experience: elegant, brand-aligned,
+          lead-friendly, and intentionally scoped to Casly Homes topics only.
+        </p>
+        <div class="proof-row">
+          <div class="proof"><strong>PNW</strong><span>Local builder positioning</span></div>
+          <div class="proof"><strong>24/7</strong><span>Guided visitor answers</span></div>
+          <div class="proof"><strong>Scoped</strong><span>Casly-only guardrails</span></div>
+        </div>
+      </div>
+
+      <section class="chat-card" aria-label="Casly Homes chatbot preview">
+        <div class="chat-topbar">
+          <div class="avatar-lockup">
+            <div class="avatar">C</div>
+            <div><h3>Casly Concierge</h3><small>Boutique homes assistant</small></div>
+          </div>
+          <div class="status-pill">Online • Casly-only</div>
+        </div>
+        <div id="chat-window" class="chat-window">
+          <div class="bubble-row">
+            <div class="bubble bot">
+              Welcome to Casly Homes. Ask me about boutique communities, home features, tours, warranty, smart-home options, or land purchasing.
+              <span class="bubble-time">Now</span>
+            </div>
+          </div>
+        </div>
+        <div class="suggestions">
+          <button type="button" data-prompt="What makes Casly Homes different?">What makes Casly Homes different?</button>
+          <button type="button" data-prompt="Can I schedule a tour?">Can I schedule a tour?</button>
+          <button type="button" data-prompt="Tell me about the warranty.">Tell me about the warranty.</button>
+          <button type="button" data-prompt="Do homes include smart-home features?">Do homes include smart-home features?</button>
+        </div>
+        <form id="composer" class="composer">
+          <input id="message" autocomplete="off" placeholder="Ask about homes, tours, warranty, or land purchasing..." />
+          <button type="submit">Send</button>
+        </form>
+      </section>
+    </section>
+
+    <section class="share-row">
+      <div class="share-card">
+        <h3>Shareable prototype link</h3>
+        <p>After deployment, replace this placeholder with the public demo URL.</p>
+        <code>https://your-streamlit-domain.example/casly-chatbot?mode=chatbot&amp;brand=caslyhomes</code>
+      </div>
+      <div class="share-card">
+        <h3>Website embed snippet</h3>
+        <p>Drop this iframe into a staging page to test the component inside the existing CaslyHomes website.</p>
+        <code>&lt;iframe src="https://your-streamlit-domain.example/casly-chatbot?mode=chatbot&amp;brand=caslyhomes" title="Casly Homes Chatbot" width="420" height="680"&gt;&lt;/iframe&gt;</code>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const keywords = ["casly", "home", "homes", "townhome", "property", "real estate", "builder", "community", "bothell", "washington", "pnw", "warranty", "qbw", "smart", "tour", "availability", "land", "floorplan", "storage", "ceiling", "contact"];
+    const responses = {
+      warranty: "Casly Homes positions each purchase with a structured QBW-backed warranty program designed to protect the home well beyond move-in.",
+      smart: "Smart-home features are presented as optional and may vary by property, so the safest next step is to ask the team which homes currently include them.",
+      tour: "I can help visitors move toward a private tour. The best flow is: collect preferred community, budget range, move-in timing, and contact details, then route the lead to info@caslyhomes.com.",
+      land: "Casly Homes also supports land-purchase conversations for property owners and agents who want guidance on unlocking a property's value.",
+      default: "Casly Homes builds boutique residential communities across the Pacific Northwest, with a focus on thoughtful layouts, enduring materials, and small-scale developments where details receive personal attention.",
+      offTopic: "I can only help with Casly Homes topics—communities, availability, tours, home features, warranty, smart-home options, land purchasing, and contact routing. Try asking: ‘What makes Casly Homes different?’"
+    };
+    const chatWindow = document.getElementById("chat-window");
+    const form = document.getElementById("composer");
+    const input = document.getElementById("message");
+
+    function now() {
+      return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function addBubble(role, text) {
+      const row = document.createElement("div");
+      row.className = `bubble-row ${role === "user" ? "user" : ""}`;
+      const bubble = document.createElement("div");
+      bubble.className = `bubble ${role}`;
+      bubble.textContent = text;
+      const time = document.createElement("span");
+      time.className = "bubble-time";
+      time.textContent = now();
+      bubble.appendChild(time);
+      row.appendChild(bubble);
+      chatWindow.appendChild(row);
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    function answer(message) {
+      const lower = message.toLowerCase();
+      const related = keywords.some(keyword => lower.includes(keyword));
+      if (!related) return responses.offTopic;
+      if (["tour", "schedule", "available", "availability", "visit"].some(term => lower.includes(term))) return responses.tour;
+      if (["warranty", "qbw", "protect"].some(term => lower.includes(term))) return responses.warranty;
+      if (["smart", "technology", "automation"].some(term => lower.includes(term))) return responses.smart;
+      if (["land", "sell", "property owner", "agent"].some(term => lower.includes(term))) return responses.land;
+      return responses.default;
+    }
+
+    function submitPrompt(prompt) {
+      if (!prompt.trim()) return;
+      addBubble("user", prompt);
+      window.setTimeout(() => addBubble("bot", answer(prompt)), 280);
+    }
+
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+      const prompt = input.value;
+      input.value = "";
+      submitPrompt(prompt);
+    });
+
+    document.querySelectorAll("[data-prompt]").forEach(button => {
+      button.addEventListener("click", () => submitPrompt(button.dataset.prompt));
+    });
+  </script>
+</body>
+</html>

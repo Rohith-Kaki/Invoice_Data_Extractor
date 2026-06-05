@@ -48,7 +48,13 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Open the app URL shown by Streamlit (usually `http://localhost:8501`).
+Open the app URL shown by Streamlit (usually `http://localhost:8501`). If the port is already in use, run `streamlit run app.py --server.port 8502` and open `http://localhost:8502`.
+
+### Chatbot prototype only
+
+The **CaslyHomes Chatbot Prototype** page can be opened from the sidebar without setting `OPENAI_API_KEY`. API keys are only needed when you click **Extract Data** in the invoice workflow.
+
+If you only want to preview the chatbot design without running Python or Streamlit, open `previews/casly_chatbot_preview.html` directly in your browser.
 
 ---
 
